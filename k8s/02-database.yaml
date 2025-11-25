@@ -49,7 +49,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: postgres:15-alpine
+          image: 099841456430.dkr.ecr.us-east-1.amazonaws.com/dev-database:latest
           ports:
             - containerPort: 5432
               name: postgres

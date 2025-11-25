@@ -44,7 +44,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: <ECR_REGISTRY>/ecommerce-backend:latest
+          image: 099841456430.dkr.ecr.us-east-1.amazonaws.com/dev-backend:latest
           ports:
             - containerPort: 3000
               name: http
