@@ -1,0 +1,206 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+  labels:
+    app: prometheus
+data:
+  alert-rules.yml: |
+    groups:
+      - name: pod_alerts
+        interval: 30s
+        rules:
+          # Alert when pod restart rate is high
+          - alert: HighPodRestartRate
+            expr: rate(kube_pod_container_status_restarts_total[5m]) > 0.6
+            for: 5m
+            labels:
+              severity: warning
+              component: kubernetes
+            annotations:
+              summary: "High pod restart rate detected"
+              description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has restarted {{ $value }} times in the last 5 minutes"
+
+          # Alert when pod is not ready
+          - alert: PodNotReady
+            expr: kube_pod_status_phase{phase!="Running"} > 0
+            for: 5m
+            labels:
+              severity: warning
+              component: kubernetes
+            annotations:
+              summary: "Pod not in Running state"
+              description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is in {{ $labels.phase }} state for more than 5 minutes"
+
+      - name: resource_alerts
+        interval: 30s
+        rules:
+          # Alert when CPU usage is high
+          - alert: HighCPUUsage
+            expr: |
+              (sum(rate(container_cpu_usage_seconds_total{container!=""}[5m])) by (namespace, pod, container) 
+              / sum(container_spec_cpu_quota{container!=""}/container_spec_cpu_period{container!=""}) by (namespace, pod, container)) * 100 > 80
+            for: 5m
+            labels:
+              severity: warning
+              component: resources
+            annotations:
+              summary: "High CPU usage detected"
+              description: "Container {{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }} CPU usage is {{ $value }}% for more than 5 minutes"
+
+          # Alert when memory usage is high
+          - alert: HighMemoryUsage
+            expr: |
+              (sum(container_memory_working_set_bytes{container!=""}) by (namespace, pod, container)
+              / sum(container_spec_memory_limit_bytes{container!=""}) by (namespace, pod, container)) * 100 > 85
+            for: 5m
+            labels:
+              severity: warning
+              component: resources
+            annotations:
+              summary: "High memory usage detected"
+              description: "Container {{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }} memory usage is {{ $value }}% for more than 5 minutes"
+
+          # Alert when node CPU usage is high
+          - alert: NodeHighCPUUsage
+            expr: (100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 80
+            for: 5m
+            labels:
+              severity: warning
+              component: node
+            annotations:
+              summary: "Node CPU usage is high"
+              description: "Node {{ $labels.instance }} CPU usage is {{ $value }}% for more than 5 minutes"
+
+          # Alert when node memory usage is high
+          - alert: NodeHighMemoryUsage
+            expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+            for: 5m
+            labels:
+              severity: warning
+              component: node
+            annotations:
+              summary: "Node memory usage is high"
+              description: "Node {{ $labels.instance }} memory usage is {{ $value }}% for more than 5 minutes"
+
+      - name: application_alerts
+        interval: 30s
+        rules:
+          # Alert when API error rate is high
+          - alert: HighAPIErrorRate
+            expr: |
+              (sum(rate(http_requests_total{status=~"5.."}[2m])) by (namespace, service)
+              / sum(rate(http_requests_total[2m])) by (namespace, service)) * 100 > 5
+            for: 2m
+            labels:
+              severity: critical
+              component: application
+            annotations:
+              summary: "High API error rate detected"
+              description: "Service {{ $labels.namespace }}/{{ $labels.service }} has {{ $value }}% error rate for more than 2 minutes"
+
+          # Alert when API response time is high
+          - alert: HighAPIResponseTime
+            expr: |
+              histogram_quantile(0.95, 
+                sum(rate(http_request_duration_seconds_bucket[5m])) by (le, namespace, service)
+              ) > 1
+            for: 5m
+            labels:
+              severity: warning
+              component: application
+            annotations:
+              summary: "High API response time detected"
+              description: "Service {{ $labels.namespace }}/{{ $labels.service }} 95th percentile response time is {{ $value }}s for more than 5 minutes"
+
+          # Alert when service is down
+          - alert: ServiceDown
+            expr: up{job=~"backend-api|frontend"} == 0
+            for: 2m
+            labels:
+              severity: critical
+              component: application
+            annotations:
+              summary: "Service is down"
+              description: "Service {{ $labels.job }} in namespace {{ $labels.namespace }} is down for more than 2 minutes"
+
+      - name: database_alerts
+        interval: 30s
+        rules:
+          # Alert when database connection pool is exhausted
+          - alert: DatabaseConnectionPoolExhausted
+            expr: |
+              (sum(pg_stat_database_numbackends) by (namespace, pod)
+              / sum(pg_settings_max_connections) by (namespace, pod)) * 100 > 90
+            for: 5m
+            labels:
+              severity: critical
+              component: database
+            annotations:
+              summary: "Database connection pool nearly exhausted"
+              description: "Database {{ $labels.namespace }}/{{ $labels.pod }} is using {{ $value }}% of available connections for more than 5 minutes"
+
+          # Alert when database is down
+          - alert: DatabaseDown
+            expr: up{job="postgresql"} == 0
+            for: 2m
+            labels:
+              severity: critical
+              component: database
+            annotations:
+              summary: "Database is down"
+              description: "PostgreSQL database in namespace {{ $labels.namespace }} is down for more than 2 minutes"
+
+          # Alert when database has too many idle connections
+          - alert: DatabaseTooManyIdleConnections
+            expr: |
+              sum(pg_stat_activity_count{state="idle"}) by (namespace, pod) > 50
+            for: 10m
+            labels:
+              severity: warning
+              component: database
+            annotations:
+              summary: "Database has too many idle connections"
+              description: "Database {{ $labels.namespace }}/{{ $labels.pod }} has {{ $value }} idle connections for more than 10 minutes"
+
+          # Alert when database query time is high
+          - alert: DatabaseSlowQueries
+            expr: |
+              rate(pg_stat_statements_mean_time_seconds[5m]) > 1
+            for: 5m
+            labels:
+              severity: warning
+              component: database
+            annotations:
+              summary: "Database has slow queries"
+              description: "Database {{ $labels.namespace }}/{{ $labels.pod }} has queries averaging {{ $value }}s for more than 5 minutes"
+
+      - name: storage_alerts
+        interval: 30s
+        rules:
+          # Alert when persistent volume is running out of space
+          - alert: PersistentVolumeSpaceLow
+            expr: |
+              (kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes) * 100 < 15
+            for: 5m
+            labels:
+              severity: warning
+              component: storage
+            annotations:
+              summary: "Persistent volume space is low"
+              description: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} has only {{ $value }}% space available"
+
+          # Alert when persistent volume is almost full
+          - alert: PersistentVolumeAlmostFull
+            expr: |
+              (kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes) * 100 < 5
+            for: 2m
+            labels:
+              severity: critical
+              component: storage
+            annotations:
+              summary: "Persistent volume is almost full"
+              description: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} has only {{ $value }}% space available"
+

@@ -1,0 +1,490 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+  labels:
+    app: grafana
+data:
+  kubernetes-cluster-overview.json: |
+    {
+      "dashboard": {
+        "title": "Kubernetes Cluster Overview",
+        "tags": ["kubernetes", "cluster"],
+        "timezone": "browser",
+        "schemaVersion": 16,
+        "version": 1,
+        "refresh": "30s",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Cluster CPU Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{container!=\"\"}[5m])) by (node)",
+                "legendFormat": "{{node}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "percentunit", "label": "CPU Usage"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Cluster Memory Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(container_memory_working_set_bytes{container!=\"\"}) by (node) / sum(machine_memory_bytes) by (node)",
+                "legendFormat": "{{node}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "percentunit", "label": "Memory Usage"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Pod Count by Namespace",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(kube_pod_status_phase{phase=\"Running\"}) by (namespace)",
+                "legendFormat": "{{namespace}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "short", "label": "Pod Count"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Node Status",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"})",
+                "refId": "A"
+              }
+            ],
+            "options": {
+              "colorMode": "value",
+              "graphMode": "none",
+              "textMode": "value_and_name"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "unit": "short",
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {"value": 0, "color": "red"},
+                    {"value": 1, "color": "green"}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 5,
+            "title": "Network I/O",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(rate(container_network_receive_bytes_total[5m])) by (pod)",
+                "legendFormat": "RX {{pod}}",
+                "refId": "A"
+              },
+              {
+                "expr": "sum(rate(container_network_transmit_bytes_total[5m])) by (pod)",
+                "legendFormat": "TX {{pod}}",
+                "refId": "B"
+              }
+            ],
+            "yaxes": [
+              {"format": "Bps", "label": "Bytes/sec"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 6,
+            "title": "Disk Usage by Node",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "targets": [
+              {
+                "expr": "(node_filesystem_size_bytes{mountpoint=\"/\"} - node_filesystem_avail_bytes{mountpoint=\"/\"}) / node_filesystem_size_bytes{mountpoint=\"/\"}",
+                "legendFormat": "{{instance}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "percentunit", "label": "Disk Usage"},
+              {"format": "short"}
+            ]
+          }
+        ]
+      }
+    }
+  application-metrics.json: |
+    {
+      "dashboard": {
+        "title": "Application Metrics",
+        "tags": ["application", "api"],
+        "timezone": "browser",
+        "schemaVersion": 16,
+        "version": 1,
+        "refresh": "30s",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Request Rate by Service",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total[5m])) by (service)",
+                "legendFormat": "{{service}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "reqps", "label": "Requests/sec"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Response Time (p50, p95, p99)",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))",
+                "legendFormat": "p50 {{service}}",
+                "refId": "A"
+              },
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))",
+                "legendFormat": "p95 {{service}}",
+                "refId": "B"
+              },
+              {
+                "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))",
+                "legendFormat": "p99 {{service}}",
+                "refId": "C"
+              }
+            ],
+            "yaxes": [
+              {"format": "s", "label": "Response Time"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Error Rate by Service",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) by (service) / sum(rate(http_requests_total[5m])) by (service)",
+                "legendFormat": "{{service}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "percentunit", "label": "Error Rate"},
+              {"format": "short"}
+            ],
+            "alert": {
+              "conditions": [
+                {
+                  "evaluator": {"params": [0.05], "type": "gt"},
+                  "operator": {"type": "and"},
+                  "query": {"params": ["A", "5m", "now"]},
+                  "reducer": {"params": [], "type": "avg"},
+                  "type": "query"
+                }
+              ],
+              "name": "High Error Rate Alert"
+            }
+          },
+          {
+            "id": 4,
+            "title": "Active Connections",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(http_connections_active) by (service)",
+                "legendFormat": "{{service}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "short", "label": "Connections"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 5,
+            "title": "Frontend CPU Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"frontend-.*\"}[5m])) by (pod)",
+                "legendFormat": "{{pod}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "percentunit", "label": "CPU Usage"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 6,
+            "title": "Backend CPU Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"backend-.*\"}[5m])) by (pod)",
+                "legendFormat": "{{pod}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "percentunit", "label": "CPU Usage"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 7,
+            "title": "Frontend Memory Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+            "targets": [
+              {
+                "expr": "sum(container_memory_working_set_bytes{pod=~\"frontend-.*\"}) by (pod)",
+                "legendFormat": "{{pod}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "bytes", "label": "Memory"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 8,
+            "title": "Backend Memory Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+            "targets": [
+              {
+                "expr": "sum(container_memory_working_set_bytes{pod=~\"backend-.*\"}) by (pod)",
+                "legendFormat": "{{pod}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "bytes", "label": "Memory"},
+              {"format": "short"}
+            ]
+          }
+        ]
+      }
+    }
+  database-metrics.json: |
+    {
+      "dashboard": {
+        "title": "Database Metrics",
+        "tags": ["database", "postgresql"],
+        "timezone": "browser",
+        "schemaVersion": 16,
+        "version": 1,
+        "refresh": "30s",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Database Connection Pool Status",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "pg_stat_database_numbackends{datname=\"ecommerce\"}",
+                "legendFormat": "Active Connections",
+                "refId": "A"
+              },
+              {
+                "expr": "pg_settings_max_connections",
+                "legendFormat": "Max Connections",
+                "refId": "B"
+              }
+            ],
+            "yaxes": [
+              {"format": "short", "label": "Connections"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Query Performance (Average Duration)",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "rate(pg_stat_statements_mean_time_seconds[5m])",
+                "legendFormat": "Avg Query Time",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "s", "label": "Duration"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Transaction Rate",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "rate(pg_stat_database_xact_commit{datname=\"ecommerce\"}[5m])",
+                "legendFormat": "Commits",
+                "refId": "A"
+              },
+              {
+                "expr": "rate(pg_stat_database_xact_rollback{datname=\"ecommerce\"}[5m])",
+                "legendFormat": "Rollbacks",
+                "refId": "B"
+              }
+            ],
+            "yaxes": [
+              {"format": "ops", "label": "Transactions/sec"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Cache Hit Ratio",
+            "type": "gauge",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(pg_stat_database_blks_hit{datname=\"ecommerce\"}) / (sum(pg_stat_database_blks_hit{datname=\"ecommerce\"}) + sum(pg_stat_database_blks_read{datname=\"ecommerce\"}))",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "min": 0,
+                "max": 1,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {"value": 0, "color": "red"},
+                    {"value": 0.8, "color": "yellow"},
+                    {"value": 0.95, "color": "green"}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 5,
+            "title": "Database CPU Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"database-.*\"}[5m])) by (pod)",
+                "legendFormat": "{{pod}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "percentunit", "label": "CPU Usage"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 6,
+            "title": "Database Memory Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(container_memory_working_set_bytes{pod=~\"database-.*\"}) by (pod)",
+                "legendFormat": "{{pod}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {"format": "bytes", "label": "Memory"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 7,
+            "title": "Database Disk I/O",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+            "targets": [
+              {
+                "expr": "rate(pg_stat_database_blks_read{datname=\"ecommerce\"}[5m])",
+                "legendFormat": "Blocks Read",
+                "refId": "A"
+              },
+              {
+                "expr": "rate(pg_stat_database_blks_hit{datname=\"ecommerce\"}[5m])",
+                "legendFormat": "Blocks Hit (Cache)",
+                "refId": "B"
+              }
+            ],
+            "yaxes": [
+              {"format": "ops", "label": "Blocks/sec"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "id": 8,
+            "title": "Database Size",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+            "targets": [
+              {
+                "expr": "pg_database_size_bytes{datname=\"ecommerce\"}",
+                "refId": "A"
+              }
+            ],
+            "options": {
+              "colorMode": "value",
+              "graphMode": "area",
+              "textMode": "value_and_name"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "unit": "bytes"
+              }
+            }
+          }
+        ]
+      }
+    }

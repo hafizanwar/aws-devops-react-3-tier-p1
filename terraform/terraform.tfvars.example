@@ -1,0 +1,26 @@
+# AWS Configuration
+aws_region  = "us-east-1"
+environment = "dev"
+
+# EKS Cluster Configuration
+cluster_name    = "aws-devops-three-tier-eks"
+cluster_version = "1.28"
+
+# VPC Configuration
+vpc_cidr             = "10.0.0.0/16"
+availability_zones   = ["us-east-1a", "us-east-1b"]
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.20.0/24"]
+
+# EKS Node Group Configuration
+node_instance_type      = "t3.medium"
+node_group_min_size     = 2
+node_group_desired_size = 2
+node_group_max_size     = 5
+
+# Cluster Logging
+enable_cluster_logging = true
+
+# ECR Configuration
+ecr_repositories         = ["frontend", "backend", "database"]
+ecr_image_retention_count = 10
