@@ -135,7 +135,3 @@ spec:
       protocol: TCP
   selector:
     app: grafana
-  sessionAffinity: ClientIP
-  sessionAffinityConfig:
-    clientIP:
-      timeoutSeconds: 10800
