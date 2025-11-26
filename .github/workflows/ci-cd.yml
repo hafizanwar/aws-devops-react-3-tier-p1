@@ -1,5 +1,5 @@
 name: CI/CD Pipeline
-# Updated to use correct GitHub secrets
+# Updated with EBS CSI driver permissions
 
 on:
   push:
