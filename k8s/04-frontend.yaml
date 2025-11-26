@@ -36,21 +36,16 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: <ECR_REGISTRY>/ecommerce-frontend:latest
+          image: 099841456430.dkr.ecr.us-east-1.amazonaws.com/dev-frontend:latest
           ports:
             - containerPort: 80
               name: http
           env:
-            - name: REACT_APP_API_URL
+            - name: BACKEND_URL
               valueFrom:
                 configMapKeyRef:
                   name: frontend-config
-                  key: REACT_APP_API_URL
-            - name: REACT_APP_ENV
-              valueFrom:
-                configMapKeyRef:
-                  name: frontend-config
-                  key: REACT_APP_ENV
+                  key: BACKEND_URL
           livenessProbe:
             httpGet:
               path: /

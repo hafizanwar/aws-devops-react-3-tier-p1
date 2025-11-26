@@ -121,8 +121,17 @@
     </div>
 
     <script>
-        // Get backend URL from environment or use default
-        const BACKEND_URL = window.BACKEND_URL || 'http://ac48c2c1fe9334e6fbb96c88e29a98b5-1924781635.us-east-1.elb.amazonaws.com:3000';
+        // Try to get backend URL from meta tag (injected by deployment), otherwise discover it
+        const metaBackend = document.querySelector('meta[name="backend-url"]');
+        let BACKEND_URL = metaBackend ? metaBackend.content : '';
+        
+        // If not set, try to use relative path (works if frontend and backend are on same domain)
+        if (!BACKEND_URL) {
+            // Get current hostname and try to find backend service
+            const currentHost = window.location.hostname;
+            // For now, use a placeholder that will be replaced during deployment
+            BACKEND_URL = 'BACKEND_URL_PLACEHOLDER';
+        }
         
         document.getElementById('api-url').textContent = BACKEND_URL;
         

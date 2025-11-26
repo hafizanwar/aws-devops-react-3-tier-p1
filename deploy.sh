@@ -5,6 +5,9 @@
 
 set -e  # Exit on any error
 
+# Enable debug mode if needed
+# set -x
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -174,6 +177,48 @@ kubectl apply -f k8s/03-backend.yaml
 print_message "$YELLOW" "Waiting for backend to be ready..."
 kubectl wait --for=condition=Ready pod -l app=backend -n ecommerce-app --timeout=300s
 
+print_message "$YELLOW" "Deploying frontend..."
+
+# Get backend LoadBalancer URL
+print_message "$YELLOW" "Getting backend LoadBalancer URL..."
+sleep 30  # Wait for LoadBalancer to be provisioned
+BACKEND_LB=$(kubectl get svc backend -n ecommerce-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
+# Wait up to 2 minutes for backend LoadBalancer
+COUNTER=0
+while [ -z "$BACKEND_LB" ] && [ $COUNTER -lt 12 ]; do
+    print_message "$YELLOW" "Waiting for backend LoadBalancer... ($((COUNTER * 10))s)"
+    sleep 10
+    BACKEND_LB=$(kubectl get svc backend -n ecommerce-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+    COUNTER=$((COUNTER + 1))
+done
+
+if [ -z "$BACKEND_LB" ]; then
+    print_message "$YELLOW" "Backend LoadBalancer not ready yet. Frontend will be deployed but may need manual configuration."
+    BACKEND_LB="BACKEND_NOT_READY"
+fi
+
+# Create a temporary index.html with the backend URL
+print_message "$YELLOW" "Configuring frontend with backend URL: http://${BACKEND_LB}:3000"
+cp frontend-simple/index.html frontend-simple/index.html.bak
+sed "s|BACKEND_URL_PLACEHOLDER|http://${BACKEND_LB}:3000|g" frontend-simple/index.html.bak > frontend-simple/index.html
+
+# Rebuild and push frontend with updated backend URL
+print_message "$YELLOW" "Rebuilding frontend with backend URL..."
+cd frontend-simple
+docker build -t ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/dev-frontend:latest .
+docker push ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/dev-frontend:latest
+cd ..
+
+# Restore original index.html
+mv frontend-simple/index.html.bak frontend-simple/index.html
+
+kubectl apply -f k8s/04-frontend-configmap.yaml
+kubectl apply -f k8s/04-frontend.yaml
+
+print_message "$YELLOW" "Waiting for frontend to be ready..."
+kubectl wait --for=condition=Ready pod -l app=frontend -n ecommerce-app --timeout=300s
+
 print_message "$YELLOW" "Deploying network policies and HPA..."
 kubectl apply -f k8s/05-network-policies.yaml
 kubectl apply -f k8s/06-hpa.yaml
@@ -211,10 +256,22 @@ echo ""
 print_message "$BLUE" "Access Information:"
 echo ""
 
+# Get frontend URL
+FRONTEND_URL=$(kubectl get svc frontend -n ecommerce-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+if [ -n "$FRONTEND_URL" ]; then
+    print_message "$GREEN" "🌐 Frontend Application: http://${FRONTEND_URL}"
+    print_message "$GREEN" "   Open this URL in your browser to access the application!"
+else
+    print_message "$YELLOW" "Frontend LoadBalancer is being provisioned..."
+    print_message "$YELLOW" "Run: kubectl get svc frontend -n ecommerce-app"
+fi
+
+echo ""
+
 # Get backend URL
 BACKEND_URL=$(kubectl get svc backend -n ecommerce-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 if [ -n "$BACKEND_URL" ]; then
-    print_message "$GREEN" "Backend API: http://${BACKEND_URL}:3000"
+    print_message "$GREEN" "🔧 Backend API: http://${BACKEND_URL}:3000"
     print_message "$GREEN" "  - Health: http://${BACKEND_URL}:3000/api/health"
     print_message "$GREEN" "  - Products: http://${BACKEND_URL}:3000/api/products"
 else
